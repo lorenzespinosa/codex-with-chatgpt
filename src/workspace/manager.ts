@@ -2,13 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import readline from "node:readline";
-import { IgnoreRules } from "./ignore.js";
+import { containsSensitiveContent, IgnoreRules } from "./ignore.js";
 import { readJsonIfExists } from "../config/paths.js";
 
 export type WorkspaceErrorCode =
   | "INVALID_PATH"
   | "PATH_OUTSIDE_WORKSPACE"
   | "ACCESS_DENIED_SENSITIVE_FILE"
+  | "ACCESS_DENIED_SECRET_CONTENT"
   | "FILE_NOT_FOUND"
   | "NOT_A_FILE"
   | "NOT_A_DIRECTORY"
@@ -212,11 +213,13 @@ export class Workspace {
     let totalLines = 0;
     let collectedBytes = 0;
     let byteTruncated = false;
+    let sensitiveContent = false;
     let actualEnd = startLine - 1;
 
     const stream = fs.createReadStream(abs, { encoding: "utf8" });
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     for await (const line of rl) {
+      if (containsSensitiveContent(line)) sensitiveContent = true;
       totalLines++;
       if (totalLines >= startLine && totalLines <= endLimit && !byteTruncated) {
         const cost = Buffer.byteLength(line, "utf8") + 1;
@@ -230,6 +233,13 @@ export class Workspace {
       }
     }
     rl.close();
+
+    if (sensitiveContent) {
+      throw new WorkspaceError(
+        "ACCESS_DENIED_SECRET_CONTENT",
+        `ACCESS_DENIED_SECRET_CONTENT: '${rel}' contains credential-like text and cannot be read.`
+      );
+    }
 
     const remaining = Math.max(0, totalLines - actualEnd);
     return {

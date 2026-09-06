@@ -72,6 +72,19 @@ export const NOISE_PATTERNS: string[] = [
   "yarn.lock",
 ];
 
+const SENSITIVE_CONTENT_PATTERNS: RegExp[] = [
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
+  /\bauthorization\s*:\s*bearer\s+[A-Za-z0-9._~+/-]{16,}={0,2}/i,
+  /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^\s:/]+:[^\s@/]{4,}@/i,
+  /\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|private[_-]?key)\b\s*[:=]\s*["']?[^\s"']{8,}/i,
+];
+
+/** True when readable text contains a credential-like value. */
+export function containsSensitiveContent(text: string): boolean {
+  return SENSITIVE_CONTENT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 export class IgnoreRules {
   private sensitive: Ignore;
   private noise: Ignore;

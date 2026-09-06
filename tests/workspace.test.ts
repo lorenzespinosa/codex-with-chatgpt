@@ -23,6 +23,7 @@ beforeAll(() => {
   write(outside, "secret.txt", "outside data\n");
   write(root, ".c2cignore", "private-notes/\n");
   write(root, "private-notes/todo.md", "secret notes\n");
+  write(root, "docs/deployment.md", "API_KEY=real-looking-value-123456\n");
   // symlink pointing outside the workspace (needs symlink privileges, e.g.
   // absent for unprivileged Windows runners — the escape tests then skip)
   symlinksReady = true;
@@ -137,6 +138,12 @@ describe("sensitive files", () => {
 });
 
 describe("read_file pagination", () => {
+  it("denies secret-like content in an otherwise allowed file", async () => {
+    await expect(ws.readFile("docs/deployment.md")).rejects.toMatchObject({
+      code: "ACCESS_DENIED_SECRET_CONTENT",
+    });
+  });
+
   it("caps unbounded reads at 400 lines and reports the remainder", async () => {
     const big = Array.from({ length: 1000 }, (_, i) => `line ${i + 1}`).join("\n") + "\n";
     write(root, "big.txt", big);
