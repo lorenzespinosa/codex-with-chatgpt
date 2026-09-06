@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { Workspace } from "./manager.js";
+import { containsSensitiveContent } from "./ignore.js";
 
 export interface SearchOptions {
   query: string;
@@ -79,6 +80,7 @@ async function searchWithRipgrep(
   return new Promise((resolvePromise, reject) => {
     const child = spawn(rgBin, args, { cwd: ws.root });
     const matches: SearchMatch[] = [];
+    const sensitiveFiles = new Map<string, boolean>();
     let truncated = false;
     const rl = readline.createInterface({ input: child.stdout });
     rl.on("line", (line) => {
@@ -95,6 +97,16 @@ async function searchWithRipgrep(
         if (event.type !== "match" || !event.data?.path?.text) return;
         const rel = path.relative(ws.root, event.data.path.text).split(path.sep).join("/");
         if (rel.startsWith("..") || ws.ignoreRules.isHidden(rel)) return;
+        let sensitive = sensitiveFiles.get(rel);
+        if (sensitive === undefined) {
+          try {
+            sensitive = containsSensitiveContent(fs.readFileSync(event.data.path.text, "utf8"));
+          } catch {
+            sensitive = true;
+          }
+          sensitiveFiles.set(rel, sensitive);
+        }
+        if (sensitive) return;
         matches.push({
           path: rel,
           line: event.data.line_number ?? 0,
@@ -154,6 +166,7 @@ async function searchWithNode(
           continue;
         }
         if (content.includes("\0")) continue;
+        if (containsSensitiveContent(content)) continue;
         const lines = content.split("\n");
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];

@@ -14,6 +14,7 @@ beforeAll(() => {
   write(root, "src/root.ts", `${globMarker}\n`);
   write(root, "root.ts", `${globMarker}\n`);
   write(root, "README.md", "This project contains needle-alpha documentation.\n");
+  write(root, "docs/deployment.md", "needle-alpha\nAPI_KEY=real-looking-value-123456\n");
   write(root, ".env", "NEEDLE-ALPHA=secret\n");
   write(root, "node_modules/pkg/index.js", "needle-alpha in dependencies\n");
   for (let i = 0; i < 30; i++) {
@@ -59,6 +60,7 @@ describe.each(engines())("search engine: %s", (engine) => {
     const paths = result.matches.map((match) => match.path);
     expect(paths.some((p) => p.includes(".env"))).toBe(false);
     expect(paths.some((p) => p.includes("node_modules"))).toBe(false);
+    expect(paths).not.toContain("docs/deployment.md");
   });
 
   it("respects the limit", async () => {
